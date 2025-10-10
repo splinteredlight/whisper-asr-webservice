@@ -17,7 +17,7 @@ from app.factory.asr_model_factory import ASRModelFactory
 from app.utils import load_audio
 
 asr_model = ASRModelFactory.create_asr_model()
-asr_model.load_model()
+# asr_model.load_model()
 
 LANGUAGE_CODES = sorted(tokenizer.LANGUAGES.keys())
 
@@ -59,6 +59,7 @@ async def asr(
     task: Union[str, None] = Query(default="transcribe", enum=["transcribe", "translate"]),
     language: Union[str, None] = Query(default=None, enum=LANGUAGE_CODES),
     initial_prompt: Union[str, None] = Query(default=None),
+
     vad_filter: Annotated[
         bool | None,
         Query(
@@ -71,10 +72,18 @@ async def asr(
         description="Word level timestamps",
         include_in_schema=(True if CONFIG.ASR_ENGINE == "faster_whisper" else False),
     ),
+
+    # ---- diarization controls ----
     diarize: bool = Query(
         default=False,
         description="Diarize the input",
-        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" and CONFIG.HF_TOKEN != "" else False),
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),  # allow even without HF token (for NeMo)
+    ),
+    diarizer: str = Query(
+        default="pyannote",
+        regex="^(pyannote|nemo)$",
+        description="Choose diarization backend",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
     ),
     min_speakers: Union[int, None] = Query(
         default=None,
@@ -86,16 +95,63 @@ async def asr(
         description="Max speakers in this file",
         include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
     ),
+
+    # ---- alignment caching policy (for WhisperX align model) ----
+    align_cache: str = Query(
+        default="none",
+        regex="^(none|cpu|cuda)$",
+        description="Alignment model caching: none (default), cpu (keep in RAM), or cuda (keep on GPU).",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+
+    # (optional) simple diarization post-process knobs; safe defaults
+    min_speech_duration: float = Query(
+        default=0.35,
+        description="Prune tiny speech islands (sec)",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+    merge_gap: float = Query(
+        default=0.30,
+        description="Merge same-speaker turns if gap ≤ this (sec)",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+    max_turn_sec: float = Query(
+        default=10.0,
+        description="Split turns longer than this (sec)",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+    refine_embeddings: bool = Query(
+        default=True,
+        description="Refine long turns with CPU embeddings (helps separate similar voices)",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+
     output: Union[str, None] = Query(default="txt", enum=["txt", "vtt", "srt", "tsv", "json"]),
 ):
+    audio = load_audio(audio_file.file, encode)
+
+    opts = {
+        "diarize": diarize,
+        "diarizer": diarizer,                  # NEW
+        "min_speakers": min_speakers,
+        "max_speakers": max_speakers,
+        "align_cache": align_cache,            # NEW
+
+        # post-process knobs (engine will ignore if not used)
+        "min_speech_duration": min_speech_duration,
+        "merge_gap": merge_gap,
+        "max_turn_sec": max_turn_sec,
+        "refine_embeddings": refine_embeddings,
+    }
+
     result = asr_model.transcribe(
-        load_audio(audio_file.file, encode),
+        audio,
         task,
         language,
         initial_prompt,
         vad_filter,
         word_timestamps,
-        {"diarize": diarize, "min_speakers": min_speakers, "max_speakers": max_speakers},
+        opts,
         output,
     )
     return StreamingResponse(
@@ -106,6 +162,7 @@ async def asr(
             "Content-Disposition": f'attachment; filename="{quote(audio_file.filename)}.{output}"',
         },
     )
+
 
 
 @app.post("/detect-language", tags=["Endpoints"])
