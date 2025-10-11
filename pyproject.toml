@@ -27,9 +27,7 @@ webdataset = ">=1.0.2"
 lhotse = ">=1.31.1"
 soundfile = ">=0.12.1"
 
-[tool.poetry.extras]
-cpu = ["torch==2.7.1", "torchaudio==2.7.1"]
-cuda = ["torch==2.7.1+cu126", "torchaudio==2.7.1+cu126"]
+
 
 [[tool.poetry.source]]
 name = "pytorch-cpu"
