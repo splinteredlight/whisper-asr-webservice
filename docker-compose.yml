@@ -2,7 +2,7 @@ services:
   whisper-asr-nemo:
     build:
       context: .
-      dockerfile: Dockerfile.gpu          # build from your custom Dockerfile
+      dockerfile: Dockerfile          # build from your custom Dockerfile
     image: whisper-asr:nemo-gpu           # tag your own image
     container_name: whisper-asr-nemo
     restart: unless-stopped
