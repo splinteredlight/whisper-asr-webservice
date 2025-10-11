@@ -25,6 +25,7 @@ WORKDIR /app
 
 # Copy only lock context first for layer caching
 COPY pyproject.toml poetry.lock ./
+RUN echo "----- pyproject in image -----" && sed -n '1,140p' pyproject.toml && echo "------------------------------"
 
 
 # Configure Poetry to create venv inside project (we already made one)
