@@ -4,7 +4,7 @@ version = "1.10.0-dev"
 description = "Whisper ASR Webservice is a general-purpose speech recognition webservice."
 authors = ["Ahmet Öner <ahmet@example.com>", "Besim Alibegovic <besim@example.com>"]
 license = "MIT"
-readme = "README.md"
+
 packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
