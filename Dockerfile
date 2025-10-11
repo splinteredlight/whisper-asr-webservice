@@ -52,4 +52,4 @@ RUN ${POETRY_VENV}/bin/pip install --no-cache-dir "nemo_toolkit[asr]" webdataset
 COPY . /app
 
 EXPOSE 9000
-ENTRYPOINT ["whisper-asr-webservice"]
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "app.webservice"]
