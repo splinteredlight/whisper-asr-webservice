@@ -177,7 +177,7 @@ class WhisperXASR(ASRModel):
 
         # ---- ALIGNMENT (lazy load + caching policy) ----
         align_cache = (options or {}).get("align_cache", "none")  # "none" | "cpu" | "cuda"
-        align_device = "cpu" if align_cache == "cpu" else CONFIG.DEVICE
+        align_device = "cpu" if align_cache == "cpu" else ("cuda" if align_cache == "cuda" else CONFIG.DEVICE)
 
         if result.get("segments"):
             # load lazily (on chosen device)
@@ -216,12 +216,19 @@ class WhisperXASR(ASRModel):
         # 2) Whisper is no longer needed → free its VRAM before diarization
         with self.model_lock:
             self._release_whisper()
+        try:
+            import torch, gc
+            torch.cuda.empty_cache()
+            gc.collect()
+        except Exception:
+            pass
 
         # ---- Diarization (optional) ----
         if options and options.get("diarize", False):
             min_speakers = options.get("min_speakers", None)
             max_speakers = options.get("max_speakers", None)
-            which = (options.get("diarizer") or "pyannote").lower()
+            import os
+            which = (options.get("diarizer") or os.getenv("DIARIZER_DEFAULT", "nemo")).lower()
 
             if which == "pyannote":
                 # keep your current pyannote path; HF token required for that model
@@ -239,28 +246,25 @@ class WhisperXASR(ASRModel):
                     self._release_diarizer()
 
             elif which == "nemo":
-                # NeMo path — no HF token needed
+                import os
                 try:
                     from .nemo_adapter import diarize_with_nemo
                 except Exception as e:
                     raise RuntimeError(f"NeMo adapter import failed: {e}")
 
-                # choose device for NeMo (CPU is fine; GPU faster if available)
-                try:
-                    import torch
-                    nemo_device = "cuda" if torch.cuda.is_available() else "cpu"
-                except Exception:
-                    nemo_device = "cpu"
+                # Prefer CPU for NeMo on ~4 GB VRAM boxes; allow override via env
+                nemo_device = os.getenv("NEMO_DEVICE", "cpu")
+                diar_model  = (options or {}).get("diarizer_model", "diar_msdd_telephonic")
 
                 diarize_segments = diarize_with_nemo(
                     audio=audio,
-                    sample_rate=16000,
+                    sample_rate=CONFIG.SAMPLE_RATE,
                     min_speakers=min_speakers,
                     max_speakers=max_speakers,
                     device=nemo_device,
+                    diarizer_model=diar_model,
                 )
 
-                # Assign speakers to words/segments by overlap (works universally)
                 result = self.assign_speakers_by_overlap(diarize_segments, result)
 
             else:

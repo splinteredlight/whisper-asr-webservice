@@ -5,6 +5,10 @@ description = "Whisper ASR Webservice is a general-purpose speech recognition we
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "fastapi (>=0.115.14)",
+    "nemo_toolkit[asr] (>=1.23.0)",  # NeMo diarization
+    "webdataset (>=1.0.2)",          # NeMo sometimes expects this via nemo.utils.webdataset
+    "lhotse (>=1.31.1)",             # used by some NeMo data/audio utils
+    "soundfile (>=0.12.1)",          # if using SoundFile writer in the NeMo adapter
     "uvicorn[standard] (>=0.35.0)",
     "python-multipart (>=0.0.20)",
     "ffmpeg-python (>=0.2.0)",
@@ -17,16 +21,13 @@ dependencies = [
     "numba (>=0.61.2)",
 ]
 authors = [
-    { name = "Ahmet Öner" },
-    { name = "Besim Alibegovic" }
+  "Ahmet Öner <ahmet@example.com>",
+  "Besim Alibegovic <besim@example.com>"
 ]
 license = { text = "MIT" }
 readme = "README.md"
 keywords = ["speech-recognition", "whisper", "asr", "webservice"]
 
-[tool.poetry]
-requires-poetry = ">=2.0"
-packages = [{ include = "app" }]
 
 [project.urls]
 Homepage = "https://github.com/ahmetoner/whisper-asr-webservice/"
@@ -55,20 +56,6 @@ name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu126"
 priority = "explicit"
 
-[tool.poetry.dependencies]
-torch = [
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu"},
-    { markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi"}
- ]
-torchaudio = [
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu"},
-    { markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi"}
- ]
-
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3.4,<9.0.0"
@@ -78,7 +65,7 @@ mkdocs-material = ">=9.6.4,<10.0.0"
 pymdown-extensions = ">=10.14.3,<11.0.0"
 
 [build-system]
-requires = ["poetry-core>=2.0"]
+requires = ["poetry-core>=1.9.0,<2.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]

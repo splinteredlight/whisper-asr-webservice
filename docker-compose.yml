@@ -1,17 +1,36 @@
-version: "3.4"
-
 services:
-  whisper-asr-webservice:
+  whisper-asr-nemo:
     build:
       context: .
-      dockerfile: Dockerfile
-    environment:
-      - ASR_MODEL=base
-    ports:
-      - "9000:9000"
-    volumes:
-      - ./app:/app/app
-      - cache-whisper:/root/.cache
+      dockerfile: Dockerfile.gpu          # build from your custom Dockerfile
+    image: whisper-asr:nemo-gpu           # tag your own image
+    container_name: whisper-asr-nemo
+    restart: unless-stopped
 
-volumes:
-  cache-whisper:
+    # Enable NVIDIA GPU in Docker (requires nvidia-container-toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    environment:
+      - TZ=America/New_York
+      - ASR_ENGINE=whisperx
+      - ASR_MODEL=${ASR_MODEL:-base}       # default base model if unset
+      - ASR_DEVICE=cuda
+      - ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE:-float16}
+      # Only needed for pyannote diarizer (not required for NeMo)
+      - HF_TOKEN=${HF_TOKEN:-}
+
+    ports:
+      - "9009:9000"
+
+    volumes:
+      # Optional: mount your modified code for quick iteration
+      - ./app:/app/app
+      # Cache to reuse downloaded models and HF data
+      - ./cache:/root/.cache
+      - ./hf_cache:/root/.cache/huggingface

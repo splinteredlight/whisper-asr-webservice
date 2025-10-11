@@ -85,7 +85,12 @@ async def asr(
         description="Choose diarization backend",
         include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
     ),
-    min_speakers: Union[int, None] = Query(
+    diarizer_model: str = Query(
+        default="diar_msdd_telephonic",
+        description="NeMo diarizer model name (e.g., diar_msdd_telephonic, diar_msdd_telephonic_v2, diar_offline)",
+        include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
+    ),
+        min_speakers: Union[int, None] = Query(
         default=None,
         description="Min speakers in this file",
         include_in_schema=(True if CONFIG.ASR_ENGINE == "whisperx" else False),
@@ -133,6 +138,7 @@ async def asr(
     opts = {
         "diarize": diarize,
         "diarizer": diarizer,                  # NEW
+        "diarizer_model": diarizer_model,
         "min_speakers": min_speakers,
         "max_speakers": max_speakers,
         "align_cache": align_cache,            # NEW

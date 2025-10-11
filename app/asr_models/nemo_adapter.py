@@ -9,40 +9,70 @@ def nemo_available() -> bool:
     except Exception:
         return False
 
+# --- WebDataset shim so NeMo can import "nemo.utils.webdataset" safely ----
+# Some NeMo builds import webdataset via a nested module path; expose it here.
+try:
+    import sys, types
+    import webdataset as _wds
+    if "nemo.utils" not in sys.modules:
+        sys.modules["nemo.utils"] = types.ModuleType("nemo.utils")
+    sys.modules["nemo.utils.webdataset"] = _wds
+except Exception:
+    # If this shim fails, NeMo might still work; fail later with a clear error.
+    pass
+
+
 def diarize_with_nemo(
     audio: "np.ndarray",           # mono float32 PCM
     sample_rate: int,              # e.g., 16000
     min_speakers: Optional[int] = None,
     max_speakers: Optional[int] = None,
     device: str = "cpu",           # "cpu" or "cuda"
+    diarizer_model: str = "diar_msdd_telephonic",
 ) -> List[Dict]:
     """
     Returns diarization turns as dicts:
         [{"start": float, "end": float, "speaker": "SPEAKER_00"}, ...]
     """
     if not nemo_available():
-        raise RuntimeError("NeMo not installed. Try: pip install nemo_toolkit soundfile")
+        raise RuntimeError("NeMo not installed. Try: pip install 'nemo_toolkit[asr]' soundfile webdataset lhotse")
 
     import os, tempfile, shutil
-    import soundfile as sf
+    try:
+        import numpy as np
+        import soundfile as sf
+    except Exception as e:
+        raise RuntimeError(f"Missing audio deps: {e}. Install 'soundfile' and system libsndfile.") from e
 
-    # 1) write the audio to a temp wav NeMo can read
+    # 1) write audio to a temp wav NeMo can read
     tmpdir = tempfile.mkdtemp(prefix="nemo_diar_")
     wav_path = os.path.join(tmpdir, "audio.wav")
     rttm_path = os.path.join(tmpdir, "out.rttm")
     sf.write(wav_path, audio, sample_rate, subtype="PCM_16")
 
-    # 2) run NeMo MSDD diarizer in-process and emit RTTM
-    #    (using a conservative, version-tolerant pattern)
+    # 2) run NeMo MSDD diarizer and extract RTTM
     try:
         from nemo.collections.asr.models.msdd_models import NeuralDiarizer
-        model = NeuralDiarizer.from_pretrained(model_name="diar_msdd_telephonic", map_location=device)
 
-        # If you know the exact speaker count, pass it (stabilizes clustering)
+        model = NeuralDiarizer.from_pretrained(
+            model_name=diarizer_model,
+            map_location=device
+        )
+
+        # If speaker count is known and fixed, pass it (stabilizes clustering)
         num_spk = min_speakers if (min_speakers is not None and min_speakers == max_speakers) else None
 
         pred = model.diarize([wav_path], num_speakers=num_spk)
-        rttm_text = pred.rttm  # NeMo returns an RTTM string
+        # Some versions return .rttm (string), others a dict => be defensive
+        rttm_text = getattr(pred, "rttm", None) or getattr(pred, "rttm_str", None)
+        if not rttm_text:
+            # fall back: if a file path is returned or an object with .write_rttm(...)
+            try:
+                rttm_text = pred if isinstance(pred, str) else None
+            except Exception:
+                pass
+        if not rttm_text:
+            raise RuntimeError("NeMo diarizer did not produce RTTM text; version mismatch?")
 
         with open(rttm_path, "w") as f:
             f.write(rttm_text)
