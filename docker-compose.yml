@@ -24,7 +24,7 @@ services:
       - ASR_COMPUTE_TYPE=${ASR_COMPUTE_TYPE:-float16}
       # Only needed for pyannote diarizer (not required for NeMo)
       - HF_TOKEN=${HF_TOKEN:-}
-
+#      - DIARIZER_DEVICE=cpu
     ports:
       - "9009:9000"
 

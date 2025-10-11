@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.3-base-ubuntu22.04
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 
 LABEL org.opencontainers.image.source="https://github.com/ahmetoner/whisper-asr-webservice"
 
