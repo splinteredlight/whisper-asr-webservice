@@ -1,50 +1,77 @@
-[project]
+[tool.poetry]
 name = "whisper-asr-webservice"
 version = "1.10.0-dev"
 description = "Whisper ASR Webservice is a general-purpose speech recognition webservice."
-requires-python = ">=3.10,<3.13"
-dependencies = [
-    "fastapi (>=0.115.14)",
-    "uvicorn[standard] (>=0.35.0)",
-    "python-multipart (>=0.0.20)",
-    "ffmpeg-python (>=0.2.0)",
-    "numpy (>=2.2.6)",
-    "openai-whisper (>=20250625)",
-    "faster-whisper (>=1.1.1)",
-    "whisperx (>=3.4.2)",
-    "tqdm (>=4.67.1)",
-    "llvmlite (>=0.44.0)",
-    "numba (>=0.61.2)",
-]
-authors = [
-    { name = "Ahmet Öner" },
-    { name = "Besim Alibegovic" }
-]
-license = { text = "MIT" }
+authors = ["Ahmet Öner", "Besim Alibegovic"]
+license = "MIT"
 readme = "README.md"
 keywords = ["speech-recognition", "whisper", "asr", "webservice"]
-
-[tool.poetry]
-requires-poetry = ">=2.0"
 packages = [{ include = "app" }]
-
-[project.urls]
+homepage = "https://github.com/ahmetoner/whisper-asr-webservice"
+# Project links (moved from [project.urls])
+[tool.poetry.urls]
 Homepage = "https://github.com/ahmetoner/whisper-asr-webservice/"
 Repository = "https://github.com/ahmetoner/whisper-asr-webservice"
 
-[project.scripts]
+# Console script (moved from [project.scripts])
+[tool.poetry.scripts]
 whisper-asr-webservice = "app.webservice:start"
 
-[project.optional-dependencies]
-cpu = [
-    "torch (==2.7.1)",
-    "torchaudio (==2.7.1)"
-]
-cuda = [
-    "torch (==2.7.1+cu126)",
-    "torchaudio (==2.7.1+cu126)"
+[tool.poetry.dependencies]
+python = ">=3.10,<3.13"
+"pyannote.audio" = ">=4.0,<4.1"
+"pyannote.pipeline" = ">=4.0,<5.0"
+"pyannote.core" = ">=6.0,<7.0"
+
+
+# Regular deps (converted from PEP 621 array-of-strings to Poetry table)
+fastapi = ">=0.115.14"
+uvicorn = {version = ">=0.35.0", extras = ["standard"]}
+python-multipart = ">=0.0.20"
+ffmpeg-python = ">=0.2.0"
+numpy = ">=2.2.2"
+openai-whisper = ">=20250625"
+faster-whisper = ">=1.1.1"
+#whisperx = "==3.7.4"
+whisperx = { git = "https://github.com/splinteredlight/whisperX.git", branch = "main" }
+tqdm = ">=4.67.1"
+llvmlite = ">=0.44.0"
+numba = ">=0.61.2"
+
+# Torch/Torchaudio come from different indexes depending on the selected extra.
+# We keep versions at 2.8.0 as required by WhisperX 3.7.4.
+# CPU wheels:
+#   - installed when extra "cpu" is selected
+# CUDA 12.6 wheels (cu126):
+#   - installed when extra "cuda" is selected
+torch = [
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu" },
+  { version = "2.8.0+cu126", markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda" },
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi" },
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi" }
 ]
 
+torchaudio = [
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu" },
+  { version = "2.8.0+cu126", markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda" },
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi" },
+  { version = "2.8.0", markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi" }
+]
+
+# Define extras (replaces [project.optional-dependencies])
+[tool.poetry.extras]
+cpu = ["torch", "torchaudio"]
+cuda = ["torch", "torchaudio"]
+
+# Dev deps are fine as-is
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3.4,<9.0.0"
+ruff = ">=0.9.6,<1.0.0"
+black = ">=25.1.0,<26.0.0"
+mkdocs-material = ">=9.6.4,<10.0.0"
+pymdown-extensions = ">=10.14.3,<11.0.0"
+
+# Extra package indexes for PyTorch wheels
 [[tool.poetry.source]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
@@ -52,30 +79,8 @@ priority = "explicit"
 
 [[tool.poetry.source]]
 name = "pytorch-cuda"
-url = "https://download.pytorch.org/whl/cu126"
+url = "https://download.pytorch.org/whl/cu126"  # <-- use cu128 if you target CUDA 12.8
 priority = "explicit"
-
-[tool.poetry.dependencies]
-torch = [
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu"},
-    { markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi"}
- ]
-torchaudio = [
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cpu"},
-    { markers = "extra == 'cuda' and extra != 'cpu' and platform_machine == 'x86_64' and sys_platform != 'darwin'", source = "pytorch-cuda"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and sys_platform == 'darwin'", source = "pypi"},
-    { markers = "extra == 'cpu' and extra != 'cuda' and platform_machine == 'aarch64' and sys_platform != 'darwin'", source = "pypi"}
- ]
-
-
-[tool.poetry.group.dev.dependencies]
-pytest = ">=8.3.4,<9.0.0"
-ruff = ">=0.9.6,<1.0.0"
-black = ">=25.1.0,<26.0.0"
-mkdocs-material = ">=9.6.4,<10.0.0"
-pymdown-extensions = ">=10.14.3,<11.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0"]
@@ -89,28 +94,12 @@ line-length = 120
 line-length = 120
 
 [tool.ruff.lint]
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "C",  # flake8-comprehensions
-    "B",  # flake8-bugbear
-]
-ignore = [
-    "E501",  # line too long, handled by black
-    "C901",  # too complex
-]
+select = ["E","W","F","I","C","B"]
+ignore = ["E501","C901"]
 
 [tool.ruff.lint.isort]
 order-by-type = true
 relative-imports-order = "closest-to-furthest"
 extra-standard-library = ["typing"]
-section-order = [
-    "future",
-    "standard-library",
-    "third-party",
-    "first-party",
-    "local-folder",
-]
+section-order = ["future","standard-library","third-party","first-party","local-folder"]
 known-first-party = []

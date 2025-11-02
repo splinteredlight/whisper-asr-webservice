@@ -17,7 +17,7 @@ from app.factory.asr_model_factory import ASRModelFactory
 from app.utils import load_audio
 
 asr_model = ASRModelFactory.create_asr_model()
-asr_model.load_model()
+# asr_model.load_model()
 
 LANGUAGE_CODES = sorted(tokenizer.LANGUAGES.keys())
 
@@ -26,7 +26,7 @@ app = FastAPI(
     title=projectMetadata["Name"].title().replace("-", " "),
     description=projectMetadata["Summary"],
     version=projectMetadata["Version"],
-    contact={"url": projectMetadata["Home-page"]},
+    contact={"url": projectMetadata.get("Home-page") or projectMetadata.get("Homepage") or "https://github.com/ahmetoner/whisper-asr-webservice"},
     swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     license_info={"name": "MIT License", "url": "https://github.com/ahmetoner/whisper-asr-webservice/blob/main/LICENCE"},
 )
