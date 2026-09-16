@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+import tempfile
 from dataclasses import asdict
 from typing import BinaryIO, TextIO
 
@@ -111,17 +113,25 @@ def load_audio(file: BinaryIO, encode=True, sr: int = CONFIG.SAMPLE_RATE):
     A NumPy array containing the audio waveform, in float32 dtype.
     """
     if encode:
-        try:
-            # This launches a subprocess to decode audio while down-mixing and resampling as necessary.
-            # Requires the ffmpeg CLI and `ffmpeg-python` package to be installed.
-            out, _ = (
-                ffmpeg.input("pipe:", threads=0)
-                .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
-                .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True, input=file.read())
-            )
-        except ffmpeg.Error as e:
-            raise RuntimeError(f"Failed to load audio: {e.stderr.decode()}") from e
+        # Decode from a temp file rather than stdin: MP4/MOV files whose moov
+        # atom sits at the end (e.g. Facebook/phone downloads) can't be parsed
+        # from a non-seekable pipe, so ffmpeg silently emits zero samples and
+        # the empty array later crashes the VAD.
+        with tempfile.NamedTemporaryFile(suffix=".media", delete=True) as tmp:
+            shutil.copyfileobj(file, tmp)
+            tmp.flush()
+            try:
+                out, _ = (
+                    ffmpeg.input(tmp.name, threads=0)
+                    .output("-", format="s16le", acodec="pcm_s16le", ac=1, ar=sr)
+                    .run(cmd="ffmpeg", capture_stdout=True, capture_stderr=True)
+                )
+            except ffmpeg.Error as e:
+                raise RuntimeError(f"Failed to load audio: {e.stderr.decode()}") from e
     else:
         out = file.read()
 
-    return np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+    audio = np.frombuffer(out, np.int16).flatten().astype(np.float32) / 32768.0
+    if audio.size == 0:
+        raise RuntimeError("Failed to load audio: no decodable audio stream found in the uploaded file")
+    return audio
