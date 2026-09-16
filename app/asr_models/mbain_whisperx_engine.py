@@ -47,7 +47,8 @@ class WhisperXASR(ASRModel):
     def _load_diarizer(self):
         if self.model['diarize_model'] is None and CONFIG.HF_TOKEN != "":
             self.model['diarize_model'] = DiarizationPipeline(
-                use_auth_token=CONFIG.HF_TOKEN,
+                token=CONFIG.HF_TOKEN,  # renamed from use_auth_token in whisperx 3.8.x
+
                 device=CONFIG.DEVICE  # keep GPU diarization; change to "cpu" if you ever want CPU
             )
 
@@ -191,7 +192,12 @@ class WhisperXASR(ASRModel):
             with self.model_lock:
                 self._load_diarizer()
 
-            diarize_segments = self.model['diarize_model'](audio, min_speakers, max_speakers)
+            # Keyword args are required: the 2nd positional parameter of
+            # DiarizationPipeline.__call__ is num_speakers, so passing these
+            # positionally forced the speaker count to exactly min_speakers.
+            diarize_segments = self.model['diarize_model'](
+                audio, min_speakers=min_speakers, max_speakers=max_speakers
+            )
             result = whisperx.assign_word_speakers(diarize_segments, result)
 
             # Free diarizer VRAM immediately after use

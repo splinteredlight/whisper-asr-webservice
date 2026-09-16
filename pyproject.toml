@@ -32,8 +32,10 @@ ffmpeg-python = ">=0.2.0"
 numpy = ">=2.2.2"
 openai-whisper = ">=20250625"
 faster-whisper = ">=1.1.1"
-#whisperx = "==3.7.4"
-whisperx = { git = "https://github.com/splinteredlight/whisperX.git", branch = "main" }
+# Upstream 3.8.x has native pyannote-4/community-1 support (3.8.0) plus the
+# word-timestamp alignment fixes (3.8.2/3.8.4) — the splinteredlight/whisperX
+# fork is no longer needed.
+whisperx = "==3.8.6"
 tqdm = ">=4.67.1"
 llvmlite = ">=0.44.0"
 numba = ">=0.61.2"
