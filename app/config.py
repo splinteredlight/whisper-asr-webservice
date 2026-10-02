@@ -41,6 +41,15 @@ class CONFIG:
     # Default sample rate for audio input. 16 kHz is commonly used in speech-to-text tasks.
     SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", 16000))
 
+    # Two-channel recordings (local mic on one channel, remote meeting audio on the
+    # other): diarize only the remote channel and attribute the mic channel to a
+    # fixed local speaker (SPEAKER_00). Stereo files whose channels carry the same
+    # programme still take the normal mono path. See app/split_channels.py.
+    SPLIT_CHANNEL_DIARIZATION = os.getenv("SPLIT_CHANNEL_DIARIZATION", "false").lower() == "true"
+    SPLIT_CHANNEL_MIC = int(os.getenv("SPLIT_CHANNEL_MIC", 0))  # 0 = left, 1 = right
+    if SPLIT_CHANNEL_MIC not in (0, 1):
+        raise ValueError("SPLIT_CHANNEL_MIC must be 0 (left) or 1 (right).")
+
     # Subtitle output options for whisperx
     SUBTITLE_MAX_LINE_WIDTH = int(os.getenv("SUBTITLE_MAX_LINE_WIDTH", 1000))
     SUBTITLE_MAX_LINE_COUNT = int(os.getenv("SUBTITLE_MAX_LINE_COUNT", 2))

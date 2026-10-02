@@ -3,11 +3,13 @@ from io import StringIO
 from threading import Thread
 from typing import BinaryIO, Union
 
+import numpy as np
 import whisperx
 from whisperx.audio import N_SAMPLES
 from whisperx.diarize import DiarizationPipeline
 from whisperx.utils import ResultWriter, SubtitlesWriter, WriteJSON, WriteSRT, WriteTSV, WriteTXT, WriteVTT
 
+from app import split_channels
 from app.asr_models.asr_model import ASRModel
 from app.config import CONFIG
 
@@ -125,6 +127,24 @@ class WhisperXASR(ASRModel):
     ):
         self.last_activity_time = time.time()
 
+        # ---- Split-channel input (see app/split_channels.py) ----
+        # load_audio() hands us a (2, time) array only when SPLIT_CHANNEL_DIARIZATION
+        # is on and the upload is stereo. ASR/alignment always use the mono downmix;
+        # the per-channel signals are kept only if the channels are truly independent.
+        mic_audio = remote_audio = None
+        if isinstance(audio, np.ndarray) and audio.ndim == 2:
+            stereo = audio
+            audio = np.ascontiguousarray(stereo.mean(axis=0, dtype=np.float32))
+            if options and options.get("diarize", False):
+                independent, why = split_channels.channels_independent(stereo, CONFIG.SAMPLE_RATE)
+                if independent:
+                    mic_audio = np.ascontiguousarray(stereo[CONFIG.SPLIT_CHANNEL_MIC])
+                    remote_audio = np.ascontiguousarray(stereo[1 - CONFIG.SPLIT_CHANNEL_MIC])
+                    print(f"Split-channel diarization ON (mic=ch{CONFIG.SPLIT_CHANNEL_MIC}): {why}")
+                else:
+                    print(f"Split-channel diarization skipped, using mono: {why}")
+            del stereo
+
         # 1) Load Whisper just-in-time
         with self.model_lock:
             if self.model is None:
@@ -195,10 +215,22 @@ class WhisperXASR(ASRModel):
             # Keyword args are required: the 2nd positional parameter of
             # DiarizationPipeline.__call__ is num_speakers, so passing these
             # positionally forced the speaker count to exactly min_speakers.
-            diarize_segments = self.model['diarize_model'](
-                audio, min_speakers=min_speakers, max_speakers=max_speakers
-            )
-            result = whisperx.assign_word_speakers(diarize_segments, result)
+            if remote_audio is not None:
+                # The local speaker is not in the remote channel, so the caller's
+                # speaker-count hints (which include them) shrink by one.
+                r_min = max(1, min_speakers - 1) if min_speakers else None
+                r_max = max(1, max_speakers - 1) if max_speakers else None
+                diarize_segments = self.model['diarize_model'](
+                    remote_audio, min_speakers=r_min, max_speakers=r_max
+                )
+                result = split_channels.assign_split_channel_speakers(
+                    diarize_segments, result, mic_audio, remote_audio, CONFIG.SAMPLE_RATE
+                )
+            else:
+                diarize_segments = self.model['diarize_model'](
+                    audio, min_speakers=min_speakers, max_speakers=max_speakers
+                )
+                result = whisperx.assign_word_speakers(diarize_segments, result)
 
             # Free diarizer VRAM immediately after use
             with self.model_lock:
